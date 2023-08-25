@@ -1,15 +1,14 @@
-import {useEffect, useState} from 'react'
+import {useCallback, useState} from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
 
-function App() {
+export default function App() {
   const [count, setCount] = useState(0)
-
-  useEffect(() => {
-    fetch('/test')
-      .then(res => res.json())
-      .then(data => console.log(data))
+  const [isStreaming, setIsStreaming] = useState(false)
+  const handleStream = useCallback(() => {
+    setIsStreaming(true)
+    fetchStream().then(() => setIsStreaming(false))
   }, [])
 
   return (
@@ -27,10 +26,13 @@ function App() {
         <button onClick={() => setCount(count => count + 1)}>
           count is {count}
         </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
+        <button onClick={handleStream} disabled={isStreaming}>
+          Fetch stream
+        </button>
       </div>
+      <p>
+        Edit <code>src/App.tsx</code> and save to test HMR
+      </p>
       <p className="read-the-docs">
         Click on the Vite and React logos to learn more
       </p>
@@ -38,4 +40,34 @@ function App() {
   )
 }
 
-export default App
+function fetchStream(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    fetch('http://localhost:3000/stream')
+      .then(response => {
+        if (!response.body) throw new Error('no response.body')
+        const reader = response.body.getReader()
+
+        function read(): Promise<void> {
+          return reader.read().then(({done, value}) => {
+            if (done) {
+              console.log('Stream complete')
+              resolve()
+              return
+            }
+
+            const chunk = new TextDecoder('utf-8').decode(value)
+            console.log('Received data:', chunk)
+
+            // Continue reading the stream
+            return read()
+          })
+        }
+
+        return read()
+      })
+      .catch(error => {
+        console.error('Error occurred:', error)
+        reject(error)
+      })
+  })
+}
